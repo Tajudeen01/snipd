@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
   const filePath = `uploads/${user?.id ?? "demo"}/${randomUUID()}-${safeName}`;
   const bucket = process.env.SUPABASE_STORAGE_BUCKET;
 
-  if (!supabaseConfigured || !bucket) {
+  if (!supabaseConfigured || !bucket || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return NextResponse.json({
       fileId: null,
       fileName: file.name,
