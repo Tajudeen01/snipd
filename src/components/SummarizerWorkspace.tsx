@@ -7,13 +7,8 @@ import {
   ChevronDown,
   Clipboard,
   FileText,
-  Loader2,
-  Mic,
   MoreHorizontal,
-  Paperclip,
   Plus,
-  Send,
-  Video,
   X,
 } from "lucide-react";
 import type { SummaryRecord } from "@/lib/database.types";
@@ -46,7 +41,6 @@ export function SummarizerWorkspace({
   const [copied, setCopied] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [sourceMenuOpen, setSourceMenuOpen] = useState(false);
   const [toneMenuOpen, setToneMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
@@ -54,7 +48,6 @@ export function SummarizerWorkspace({
   const recentDocuments = uploadedDocument ? [uploadedDocument] : [];
   const profileName = userEmail?.split("@")[0]?.replace(/[._-]+/g, " ") || "Bolarinwa ahmed";
   const displayName = profileName.split(" ")[0] || profileName;
-  const activeContent = sourceType === "text" ? text : uploadedDocument?.extractedText ?? "";
   const selectedTone = getToneLabel(tone);
 
   async function handleUpload(event: React.ChangeEvent<HTMLInputElement>) {
@@ -72,7 +65,6 @@ export function SummarizerWorkspace({
     const formData = new FormData();
     formData.append("file", file);
     setIsUploading(true);
-    setSourceMenuOpen(false);
 
     const response = await fetch("/api/upload", { method: "POST", body: formData });
     const payload = await response.json();
@@ -161,7 +153,6 @@ export function SummarizerWorkspace({
     setError(null);
     setCopied(false);
     setSourceType("text");
-    setSourceMenuOpen(false);
   }
 
   function removeDocument() {
@@ -316,8 +307,6 @@ export function SummarizerWorkspace({
                 error={error}
                 isGenerating={isGenerating}
                 isUploading={isUploading}
-                sourceMenuOpen={sourceMenuOpen}
-                setSourceMenuOpen={setSourceMenuOpen}
                 fileInputRef={fileInputRef}
                 textAreaRef={textAreaRef}
                 text={text}
@@ -325,7 +314,6 @@ export function SummarizerWorkspace({
                 handleGenerate={handleGenerate}
                 handleUpload={handleUpload}
                 removeDocument={removeDocument}
-                activeContent={activeContent}
               />
             )}
           </div>
@@ -365,8 +353,6 @@ function IntroPanel({
   error,
   isGenerating,
   isUploading,
-  sourceMenuOpen,
-  setSourceMenuOpen,
   fileInputRef,
   textAreaRef,
   text,
@@ -374,15 +360,12 @@ function IntroPanel({
   handleGenerate,
   handleUpload,
   removeDocument,
-  activeContent,
 }: {
   displayName: string;
   uploadedDocument: UploadedDocument | null;
   error: string | null;
   isGenerating: boolean;
   isUploading: boolean;
-  sourceMenuOpen: boolean;
-  setSourceMenuOpen: Dispatch<SetStateAction<boolean>>;
   fileInputRef: RefObject<HTMLInputElement>;
   textAreaRef: RefObject<HTMLTextAreaElement>;
   text: string;
@@ -390,21 +373,21 @@ function IntroPanel({
   handleGenerate: () => void;
   handleUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
   removeDocument: () => void;
-  activeContent: string;
 }) {
+  const hasText = text.length > 0;
+
   return (
-    <div className="mx-auto flex w-full max-w-[760px] flex-1 flex-col items-center justify-center pb-24">
-      <div className="text-center animate-rise">
-        <h1 className="text-[28px] font-semibold tracking-[-0.04em] text-[#303030] sm:text-[34px]">
+    <div className="mx-auto flex w-full max-w-[768px] flex-1 flex-col items-center justify-center pb-24">
+      <div className="flex w-[358px] max-w-full flex-col items-center gap-2 text-center animate-rise">
+        <h1 className="min-w-full text-[28px] font-normal leading-9 tracking-[-0.04em] text-[#121212]">
           Hi, {displayName}
         </h1>
-        <p className="mx-auto mt-3 max-w-[560px] text-balance text-[16px] leading-7 text-[#8a8a8a]">
-          Upload documents, paste text, or type directly to start summarizing.
-          Get clear, concise summaries in seconds.
+        <p className="w-full text-balance text-[16px] font-normal leading-6 text-[#928f8b]">
+          Upload documents, paste a web link, or type directly to start summarizing.
         </p>
       </div>
 
-      <div className="relative mt-12 w-full animate-rise [animation-delay:60ms]">
+      <div className="relative mt-6 w-full animate-rise [animation-delay:60ms]">
         {uploadedDocument ? (
           <div className="mb-4 flex justify-center">
             <div className="flex min-w-[270px] items-center gap-3 rounded-[15px] bg-[#f5f5f3] px-4 py-3">
@@ -427,89 +410,54 @@ function IntroPanel({
           </div>
         ) : null}
 
-        <div className="overflow-hidden rounded-[18px] bg-[#f7f7f5] shadow-[0_12px_40px_rgba(0,0,0,0.045)] transition focus-within:shadow-[0_18px_55px_rgba(0,0,0,0.08)]">
+        <div className="relative h-[125px] w-full rounded-[20px] bg-[#f6f6f4]">
           <textarea
             ref={textAreaRef}
             value={text}
             onChange={(event) => setText(event.target.value)}
             onInput={(event) => setText(event.currentTarget.value)}
-            disabled={Boolean(uploadedDocument)}
-            placeholder={uploadedDocument ? "Ready to summarize the uploaded document" : "Start typing or paste a web link"}
-            className="h-[58px] w-full resize-none overflow-hidden bg-white px-5 py-5 text-[14px] font-medium text-[#555] outline-none placeholder:text-[#c4c4c4] disabled:cursor-not-allowed"
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                handleGenerate();
+              }
+            }}
+            disabled={Boolean(uploadedDocument) || isGenerating}
+            placeholder={uploadedDocument ? "Ready to summarize the uploaded document" : "Start typing"}
+            className={cn(
+              "absolute left-4 right-0 top-2 h-11 resize-none overflow-hidden rounded-[12px] bg-transparent py-2.5 pr-4 text-[16px] font-normal leading-6 caret-[#121212] outline-none placeholder:text-[#928f8b] focus:outline-none focus-visible:outline-none disabled:cursor-not-allowed disabled:text-[#928f8b]",
+              hasText ? "text-[#121212]" : "text-[#928f8b]",
+            )}
           />
-          <div className="flex min-h-[58px] items-center justify-between gap-3 px-4 py-2">
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setSourceMenuOpen((open) => !open)}
-                className="grid h-10 w-10 place-items-center rounded-full text-[#777] transition hover:bg-white hover:text-[#222] active:scale-95"
-                aria-label="Add source"
-              >
-                <Plus className="h-5 w-5" aria-hidden />
-              </button>
-
-              {sourceMenuOpen ? (
-                <div className="absolute left-0 top-12 z-20 w-[260px] rounded-[18px] border border-[#eeeeec] bg-white p-2 shadow-[0_22px_70px_rgba(0,0,0,0.12)] animate-pop">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex w-full items-center gap-3 rounded-[13px] px-3 py-3 text-left text-[14px] font-medium text-[#555] transition hover:bg-[#f7f7f5]"
-                  >
-                    <Paperclip className="h-5 w-5 text-[#5c5c5c]" aria-hidden />
-                    Add a file
-                  </button>
-                  <div className="flex items-center justify-between rounded-[13px] px-3 py-3 text-[14px] font-medium text-[#777]">
-                    <span className="flex items-center gap-3">
-                      <Video className="h-5 w-5 text-[#5c5c5c]" aria-hidden />
-                      Video upload
-                    </span>
-                    <span className="rounded-full bg-[#f1f1ef] px-2.5 py-1 text-[12px] text-[#aaa]">Soon</span>
-                  </div>
-                  <div className="flex items-center justify-between rounded-[13px] px-3 py-3 text-[14px] font-medium text-[#777]">
-                    <span className="flex items-center gap-3">
-                      <Mic className="h-5 w-5 text-[#5c5c5c]" aria-hidden />
-                      Audio upload
-                    </span>
-                    <span className="rounded-full bg-[#f1f1ef] px-2.5 py-1 text-[12px] text-[#aaa]">Soon</span>
-                  </div>
-                </div>
-              ) : null}
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
-                onChange={handleUpload}
-                disabled={isUploading}
-                className="sr-only"
-              />
-            </div>
-
+          <div className="absolute left-0 top-[85px] h-8 w-[49px] overflow-visible">
             <button
               type="button"
-              onClick={handleGenerate}
-              disabled={isGenerating || isUploading}
-              className="grid h-10 w-10 place-items-center rounded-[11px] bg-[#050505] text-white shadow-[0_12px_24px_rgba(0,0,0,0.18)] transition hover:translate-y-[-1px] hover:bg-[#181818] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-              aria-label="Generate summary"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              className="group relative flex h-8 w-[49px] cursor-pointer flex-col items-center gap-2 overflow-visible disabled:cursor-not-allowed disabled:opacity-60"
+              aria-label="Add files"
             >
-              {isGenerating || isUploading ? (
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-              ) : (
-                <Send className="h-4 w-4" aria-hidden />
-              )}
+              <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full bg-transparent p-2 text-[#858585] transition-colors duration-150 ease-[var(--ease-snappy)] group-hover:bg-white">
+                <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
+              </span>
+              <span className="pointer-events-none flex h-6 min-w-[72px] shrink-0 items-center justify-center rounded-[7px] bg-[#333] px-2.5 py-1 text-[12px] font-normal leading-4 text-white opacity-0 transition-opacity duration-150 ease-[var(--ease-snappy)] group-hover:opacity-100">
+                Add files
+              </span>
             </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+              onChange={handleUpload}
+              disabled={isUploading}
+              className="sr-only"
+            />
           </div>
         </div>
 
         {error ? (
           <p className="mt-4 rounded-[14px] bg-[#fff2f0] px-4 py-3 text-center text-[14px] font-medium text-[#c14b3f] animate-rise">
             {error}
-          </p>
-        ) : null}
-
-        {activeContent ? (
-          <p className="mt-3 text-center text-[12px] font-medium text-[#b5b5b5]">
-            {activeContent.length.toLocaleString()} characters ready
           </p>
         ) : null}
       </div>
